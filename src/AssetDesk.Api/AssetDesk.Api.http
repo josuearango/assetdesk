@@ -1,0 +1,173 @@
+@host = http://localhost:5080
+@actor = jarango
+
+### ---------------------------------------------------------------------------
+### Salud
+### ---------------------------------------------------------------------------
+
+GET {{host}}/health
+
+### ---------------------------------------------------------------------------
+### Activos
+### ---------------------------------------------------------------------------
+
+# @name crearActivo
+POST {{host}}/api/assets
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{
+  "assetTag": "LAP-0001",
+  "name": "ThinkPad T14 Gen 4",
+  "category": "Laptop",
+  "serialNumber": "PF3X9ABC",
+  "purchasedOn": "2025-03-10",
+  "warrantyExpiresOn": "2028-03-10"
+}
+
+###
+@assetId = {{crearActivo.response.body.id}}
+
+### Asignarlo a un usuario
+POST {{host}}/api/assets/{{assetId}}/assignment
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "userId": "mlopez", "note": "Entrega por onboarding" }
+
+### Reasignarlo: el historial debe mostrar devolucion implicita + nueva entrega
+POST {{host}}/api/assets/{{assetId}}/assignment
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "userId": "cgarcia", "note": "Cambio de puesto" }
+
+### Ver el activo con su bitacora completa
+GET {{host}}/api/assets/{{assetId}}
+X-Acting-User: {{actor}}
+
+### Buscar con filtros y paginado
+GET {{host}}/api/assets?status=Assigned&page=1&pageSize=10
+
+### ---------------------------------------------------------------------------
+### Tickets
+### ---------------------------------------------------------------------------
+
+# @name crearTicket
+POST {{host}}/api/tickets
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{
+  "title": "No enciende despues de la actualizacion de BIOS",
+  "description": "El equipo no da video. Se intento reset de CMOS sin exito.",
+  "priority": "High",
+  "assetId": {{assetId}}
+}
+
+###
+@ticketId = {{crearTicket.response.body.id}}
+
+# @name crearSubtarea
+POST {{host}}/api/tickets
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{
+  "title": "Cotizar reemplazo de motherboard",
+  "priority": "Medium",
+  "parentTicketId": {{ticketId}}
+}
+
+###
+@subtaskId = {{crearSubtarea.response.body.id}}
+
+### Mover el padre a InProgress
+PUT {{host}}/api/tickets/{{ticketId}}/status
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "status": "InProgress" }
+
+### Resolverlo
+PUT {{host}}/api/tickets/{{ticketId}}/status
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "status": "Resolved", "note": "Motherboard reemplazada" }
+
+
+### ###########################################################################
+### CASOS QUE DEBEN FALLAR. Si alguno responde 200, hay un bug.
+### ###########################################################################
+
+### REGLA 1 -> espera 409: cerrar el padre con la subtarea todavia abierta
+PUT {{host}}/api/tickets/{{ticketId}}/status
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "status": "Closed" }
+
+### Transicion invalida -> espera 409: de Resolved no se salta a OnHold
+PUT {{host}}/api/tickets/{{ticketId}}/status
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "status": "OnHold" }
+
+### Tag duplicado -> espera 409
+POST {{host}}/api/assets
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "assetTag": "LAP-0001", "name": "Duplicado", "category": "Laptop" }
+
+### Request mal formado -> espera 400 (falta el nombre, que es obligatorio)
+POST {{host}}/api/assets
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "assetTag": "LAP-9999", "category": "Laptop" }
+
+### Inexistente -> espera 404
+GET {{host}}/api/assets/999999
+
+
+### ###########################################################################
+### Secuencia de la regla 2: dar de baja y despues intentar crear un ticket
+### ###########################################################################
+
+### Cerrar primero la subtarea, para poder cerrar el padre (regla 1 satisfecha)
+PUT {{host}}/api/tickets/{{subtaskId}}/status
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "status": "Cancelled", "note": "Se decide no reemplazar" }
+
+### Ahora si cierra -> espera 200
+PUT {{host}}/api/tickets/{{ticketId}}/status
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "status": "Closed" }
+
+### Dar de baja el activo -> espera 200
+POST {{host}}/api/assets/{{assetId}}/decommission
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "note": "Fin de vida util, no vale la pena repararlo" }
+
+### REGLA 2 -> espera 409: ticket nuevo contra un activo dado de baja
+POST {{host}}/api/tickets
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "title": "Revisar equipo", "priority": "Low", "assetId": {{assetId}} }
+
+### Y tampoco se puede reasignar -> espera 409
+POST {{host}}/api/assets/{{assetId}}/assignment
+Content-Type: application/json
+X-Acting-User: {{actor}}
+
+{ "userId": "otro" }
