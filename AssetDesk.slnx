@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AssetDesk.Api/AssetDesk.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AssetDesk.Tests/AssetDesk.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,20 @@
+# Normaliza finales de linea: se guardan LF en el repo y se checkoutean segun la
+# plataforma. Sin esto, un repo escrito en Windows genera ruido al clonarse en el
+# runner Linux de CI.
+* text=auto
+
+*.cs        text diff=csharp
+*.csproj    text
+*.slnx      text
+*.json      text
+*.yml       text
+*.md        text
+*.http      text
+*.sh        text eol=lf
+*.ps1       text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.dll binary
+*.exe binary
