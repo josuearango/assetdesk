@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using AssetDesk.Api.Application.Abstractions;
 using AssetDesk.Api.Application.Services;
 using AssetDesk.Api.Infrastructure.Identity;
@@ -6,6 +5,7 @@ using AssetDesk.Api.Infrastructure.Persistence;
 using AssetDesk.Api.Infrastructure.Repositories;
 using AssetDesk.Api.Infrastructure.Web;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,11 +50,14 @@ builder.Services.AddScoped<ICurrentUser, HeaderCurrentUser>();
 // ---------------------------------------------------------------------------
 // Web
 // ---------------------------------------------------------------------------
-builder.Services.AddControllers()
-    .AddJsonOptions(o =>
-        // Los enums viajan como texto ("InProgress"), no como numero. Un 1 en el JSON no
-        // le dice nada a quien consume la API y se rompe si el enum se reordena.
-        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+// Los enums viajan como texto ("InProgress"), no como numero: un 1 en el JSON no le dice
+// nada a quien consume la API y se rompe si el enum se reordena.
+//
+// El convertidor NO se registra aca, sino como atributo en cada enum. La razon: MVC y el
+// generador de OpenAPI leen objetos de configuracion JSON distintos, asi que un convertidor
+// puesto en AddJsonOptions hacia que la API respondiera "High" mientras el schema publicado
+// seguia diciendo "integer". El atributo viaja con el tipo y las dos cosas coinciden.
+builder.Services.AddControllers();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -84,6 +87,32 @@ builder.Services.AddOpenApi(options =>
                 "Mientras no haya autenticacion, el autor de cada operacion se manda en la " +
                 "cabecera `X-Acting-User`."
         };
+        return Task.CompletedTask;
+    });
+
+    // La cabecera X-Acting-User la consume HeaderCurrentUser, no un parametro de accion, asi
+    // que el generador no la puede descubrir sola y Swagger no ofrecia donde escribirla.
+    // Se declara aca en lugar de ensuciar la firma de cada controller con un [FromHeader]
+    // que nadie usa. Solo en las operaciones que mutan: en un GET no hay nada que auditar.
+    options.AddOperationTransformer((operation, context, ct) =>
+    {
+        var method = context.Description.HttpMethod;
+        if (method is "POST" or "PUT" or "PATCH" or "DELETE")
+        {
+            operation.Parameters ??= [];
+            operation.Parameters.Add(new OpenApiParameter
+            {
+                Name = HeaderCurrentUser.HeaderName,
+                In = ParameterLocation.Header,
+                Required = false,
+                Description =
+                    "Quien ejecuta la operacion. Queda como autor en la bitacora. " +
+                    "Provisional: cuando entre la autenticacion, el autor sale del token " +
+                    "y esta cabecera desaparece.",
+                Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                Example = "jarango"
+            });
+        }
         return Task.CompletedTask;
     });
 });

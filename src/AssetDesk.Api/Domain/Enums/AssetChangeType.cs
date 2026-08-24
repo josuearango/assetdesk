@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace AssetDesk.Api.Domain.Enums;
 
+[JsonConverter(typeof(JsonStringEnumConverter<AssetChangeType>))]
 public enum AssetChangeType
 {
     Created = 0,

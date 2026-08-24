@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace AssetDesk.Api.Domain.Enums;
 
+[JsonConverter(typeof(JsonStringEnumConverter<AssetCategory>))]
 public enum AssetCategory
 {
     Laptop = 0,

@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace AssetDesk.Api.Domain.Enums;
 
+[JsonConverter(typeof(JsonStringEnumConverter<TicketChangeType>))]
 public enum TicketChangeType
 {
     Created = 0,

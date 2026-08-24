@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace AssetDesk.Api.Domain.Enums;
 
+[JsonConverter(typeof(JsonStringEnumConverter<TicketPriority>))]
 public enum TicketPriority
 {
     Low = 0,

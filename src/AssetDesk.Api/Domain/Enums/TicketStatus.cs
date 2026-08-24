@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace AssetDesk.Api.Domain.Enums;
 
 /// <summary>
 /// Estados de un ticket. Closed y Cancelled son terminales: no se sale de ellos.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<TicketStatus>))]
 public enum TicketStatus
 {
     New = 0,
