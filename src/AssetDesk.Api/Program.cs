@@ -62,7 +62,31 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database");
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    // Sin esto el documento toma el nombre del assembly como titulo. Swagger es lo primero
+    // que abre alguien que evalua la API, asi que la portada se escribe a proposito.
+    options.AddDocumentTransformer((document, context, ct) =>
+    {
+        document.Info = new()
+        {
+            Title = "AssetDesk API",
+            Version = "v1",
+            Description =
+                "Gestion de activos de TI y tickets de soporte.\n\n" +
+                "Tres reglas de negocio se obligan desde el dominio y devuelven **409 Conflict** " +
+                "cuando se intentan violar:\n\n" +
+                "1. No se cierra un ticket que tiene subtareas abiertas.\n" +
+                "2. Un activo dado de baja no acepta tickets nuevos.\n" +
+                "3. Todo cambio queda registrado con autor y momento.\n\n" +
+                "Los codigos de error separan dos preguntas distintas: **400** es un request mal " +
+                "formado, **409** es un request correcto que el estado actual no permite.\n\n" +
+                "Mientras no haya autenticacion, el autor de cada operacion se manda en la " +
+                "cabecera `X-Acting-User`."
+        };
+        return Task.CompletedTask;
+    });
+});
 
 var app = builder.Build();
 
